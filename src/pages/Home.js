@@ -1,14 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { nets,
-  loadFaceLandmarkModel,
-  loadFaceRecognitionModel,
-  SsdMobilenetv1Options,
-  detectSingleFace,
-  fetchImage,
-  FaceMatcher,
-  LabeledFaceDescriptors,
-  utils,
-} from "face-api.js";
+import { nets, loadFaceLandmarkModel, loadFaceRecognitionModel, SsdMobilenetv1Options, detectSingleFace, fetchImage, FaceMatcher, LabeledFaceDescriptors, utils } from "face-api.js";
 import allImages from "../images.json";
 import { useHistory } from "react-router-dom";
 
@@ -20,29 +11,35 @@ function Home() {
   const [time, setTime] = useState("-");
   const [fps, setFps] = useState("-");
   const [loading, setLoading] = useState(true);
+  const [stream, setStream] = useState(null);
   let forwardTimes = [];
 
   useEffect(() => {
     const init = async () => {
-      // Load model
-      await nets.ssdMobilenetv1.load("/models");
-      await loadFaceLandmarkModel("/models");
-      await loadFaceRecognitionModel("/models");
+      try {
+        // Load model
+        await nets.ssdMobilenetv1.load("/models");
+        await loadFaceLandmarkModel("/models");
+        await loadFaceRecognitionModel("/models");
 
-      // Fetch Image and Create Face Matcher
-      const descriptor = await Promise.all(
-        allImages.map(async (data) => {
-          const input = await fetchImage(`images/${data}`);
-          const fullFaceDescription = await detectSingleFace(input).withFaceLandmarks().withFaceDescriptor();
-          return new LabeledFaceDescriptors(data.split(".")[0], [fullFaceDescription.descriptor]);
-        })
-      );
-      setFaceMatcher(new FaceMatcher(descriptor, 0.6));
+        // Fetch Image and Create Face Matcher
+        const descriptor = await Promise.all(
+          allImages.map(async (data) => {
+            const input = await fetchImage(`images/${data}`);
+            const fullFaceDescription = await detectSingleFace(input).withFaceLandmarks().withFaceDescriptor();
+            return new LabeledFaceDescriptors(data.split(".")[0], [fullFaceDescription.descriptor]);
+          })
+        );
+        setFaceMatcher(new FaceMatcher(descriptor, 0.6));
 
-      // Stream Video
-      const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
-      inputVideo.current.srcObject = stream;
-      setLoading(false);
+        // Stream Video
+        const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+        inputVideo.current.srcObject = stream;
+        setStream(stream);
+        setLoading(false);
+      } catch (err) {
+        window.location.reload();
+      }
     };
     init();
     return;
@@ -75,10 +72,17 @@ function Home() {
     }
     if (inputVideo.current) setTimeout(() => onPlay());
   };
+
+  const addFace = () => {
+    stream.getTracks().forEach((track) => {
+      track.stop();
+    });
+    history.push("/addface");
+  };
   return (
     <div>
       <div style={{ position: "relative", marginTop: "50px" }}>
-        <video ref={inputVideo} onLoadedMetadata={onPlay} autoPlay muted playsInline></video>
+        <video ref={inputVideo} onLoadedMetadata={onPlay} autoPlay muted playsInline style={{ transform: "scaleX(-1)" }}></video>
         {loading ? (
           <h1>Loading ...</h1>
         ) : (
@@ -93,7 +97,7 @@ function Home() {
                 <input disabled value={fps} type="text" className="bold" />
               </div>
             </div>
-            <button type="button" className="btn btn-primary mt-3" onClick={() => history.push("/addface")}>
+            <button type="button" className="btn btn-primary mt-3" onClick={addFace}>
               Add Your Face
             </button>
           </>
